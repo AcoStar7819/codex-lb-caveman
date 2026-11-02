@@ -143,7 +143,14 @@ when upstream reports a different actual tier.
 - `message.input_image.image_url`
 - `message.output_text.logprobs`
 - `reasoning.encrypted_content`
+- `output.encrypted_content`
 - `web_search_call.action.sources`
+
+Encrypted output includes pass through the same validation and forwarding path as
+encrypted reasoning includes. For example, `include: ["output.encrypted_content"]`
+reaches upstream unchanged. This keeps clients from failing local validation;
+upstream determines the returned encrypted content. Unknown include values still
+produce an invalid-request error.
 
 ## Failure Modes
 

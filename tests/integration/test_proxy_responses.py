@@ -182,6 +182,35 @@ async def test_proxy_responses_no_accounts(async_client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["/backend-api/codex/responses", "/v1/responses"])
+async def test_responses_forwards_encrypted_output_include(async_client, monkeypatch, path: str):
+    auth_json = _make_auth_json("acc_encrypted_include", "encrypted-include@example.com")
+    response = await async_client.post(
+        "/api/accounts/import",
+        files={"auth_json": ("auth.json", json.dumps(auth_json), "application/json")},
+    )
+    assert response.status_code == 200
+
+    seen_payload: dict[str, object] = {}
+
+    async def fake_stream(payload, headers, access_token, account_id, **kwargs):
+        seen_payload.update(payload.to_payload())
+        yield (
+            'data: {"type":"response.completed","response":{"id":"resp_encrypted_include",'
+            '"object":"response","status":"completed","output":[]}}\n\n'
+        )
+
+    monkeypatch.setattr(proxy_module, "core_stream_responses", fake_stream)
+    includes = ["reasoning.encrypted_content", "output.encrypted_content"]
+    response = await async_client.post(
+        path,
+        json={"model": "gpt-5.1", "instructions": "", "input": [], "include": includes, "stream": True},
+    )
+    assert response.status_code == 200
+    assert seen_payload["include"] == includes
+
+
+@pytest.mark.asyncio
 async def test_backend_responses_prohibits_fast_model_alias_priority_tier(async_client, monkeypatch):
     raw_account_id = "acc_prohibit_fast_mode"
     auth_json = _make_auth_json(raw_account_id, "prohibit-fast-mode@example.com")

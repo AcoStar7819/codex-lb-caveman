@@ -1,6 +1,18 @@
 # syntax=docker/dockerfile:1.7
 FROM ghcr.io/astral-sh/uv:0.13.1 AS uv-bin
 
+# Official stateless encoder, built from a fixed source revision. No runtime
+# download, cloud account, Node installation or extra container is needed.
+FROM golang:1.26.10-bookworm AS caveman-build
+WORKDIR /src/caveman
+RUN git init . \
+    && git remote add origin https://github.com/JuliusBrussee/caveman.git \
+    && git fetch --depth 1 origin 2e068f735253cce28256744804785f01887d9646 \
+    && git checkout --detach FETCH_HEAD
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -mod=readonly -o /out/caveman-engine ./engine/cmd/caveman-engine
+
 FROM rust:1.99.0-slim-bookworm AS native-egress-build
 
 WORKDIR /src
@@ -70,6 +82,9 @@ RUN adduser --disabled-password --gecos "" app \
 
 COPY --from=python-build /opt/venv /opt/venv
 COPY --from=native-egress-build /tmp/codex-lb-native-egress /usr/local/bin/codex-lb-native-egress
+COPY --from=caveman-build /out/caveman-engine /usr/local/bin/caveman-engine
+COPY --from=caveman-build /src/caveman/LICENSE /usr/share/doc/caveman/LICENSE
+COPY --from=caveman-build /src/caveman/NOTICE /usr/share/doc/caveman/NOTICE
 COPY --chown=app:app app app
 COPY --chown=app:app config config
 COPY --chown=app:app scripts scripts

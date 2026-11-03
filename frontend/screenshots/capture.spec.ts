@@ -184,6 +184,18 @@ async function capture(
 
 // ── Scenes ──
 
+test("api key Caveman limits", async ({ page }) => {
+  await capture(page, {
+    file: `api-key-caveman-${process.env.CAVEMAN_SCREENSHOT_PHASE ?? "after"}.jpg`,
+    theme: "light",
+    route: "/settings",
+    beforeScreenshot: async (currentPage) => {
+      await currentPage.getByRole("button", { name: "Create key", exact: true }).click();
+      await currentPage.getByRole("dialog").waitFor();
+    },
+  });
+});
+
 test("dashboard — light", async ({ page }) => {
   await capture(page, { file: "dashboard.jpg", theme: "light", route: "/dashboard" });
 });

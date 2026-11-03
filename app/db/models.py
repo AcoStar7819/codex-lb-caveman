@@ -1741,6 +1741,7 @@ class ApiKey(Base):
     key_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     key_prefix: Mapped[str] = mapped_column(String, nullable=False)
     allowed_models: Mapped[str | None] = mapped_column(Text, nullable=True)
+    caveman_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
     apply_to_codex_model: Mapped[bool] = mapped_column(
         Boolean,
         default=False,

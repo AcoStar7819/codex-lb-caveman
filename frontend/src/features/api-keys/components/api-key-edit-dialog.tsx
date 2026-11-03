@@ -100,6 +100,7 @@ type ApiKeyEditDraft = {
   limitRules: LimitRuleCreate[];
   expiresAt: Date | null;
   applyToCodexModel: boolean;
+  cavemanEnabled: boolean;
   enforcedModel: string;
   enforcedReasoningEffort: string;
   enforcedServiceTier: string;
@@ -118,6 +119,7 @@ function createApiKeyEditDraft(apiKey: ApiKey): ApiKeyEditDraft {
     limitRules: limitsToCreateRules(apiKey),
     expiresAt: parseDate(apiKey.expiresAt),
     applyToCodexModel: apiKey.applyToCodexModel,
+    cavemanEnabled: apiKey.cavemanEnabled,
     enforcedModel: apiKey.enforcedModel || "",
     enforcedReasoningEffort: apiKey.enforcedReasoningEffort || "none",
     enforcedServiceTier: apiKey.enforcedServiceTier || "none",
@@ -168,6 +170,7 @@ function ApiKeyEditForm({ apiKey, busy, onSubmit, onClose }: ApiKeyEditFormProps
       name: values.name,
       allowedModels: draft.selectedModels.length > 0 ? draft.selectedModels : null,
       applyToCodexModel: draft.applyToCodexModel,
+      cavemanEnabled: draft.cavemanEnabled,
       enforcedModel: draft.enforcedModel.trim() ? draft.enforcedModel.trim() : null,
       enforcedReasoningEffort:
         draft.enforcedReasoningEffort === "none" ? null : draft.enforcedReasoningEffort as ReasoningEffortType,
@@ -400,6 +403,16 @@ function ApiKeyEditForm({ apiKey, busy, onSubmit, onClose }: ApiKeyEditFormProps
           {/* Right column — Limits */}
           <div className="max-h-[55vh] space-y-3 overflow-y-auto overscroll-contain pl-1 pr-2 max-sm:mt-3 max-sm:border-t max-sm:pt-3">
             <h4 className="sticky top-0 bg-background pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("apiKeys.form.limits")}</h4>
+            <div className="flex items-center gap-2 rounded-md border p-2 text-sm">
+              <Checkbox
+                id="edit-api-key-caveman"
+                checked={draft.cavemanEnabled}
+                onCheckedChange={(checked) => updateDraft({ cavemanEnabled: checked === true })}
+              />
+              <label htmlFor="edit-api-key-caveman" className="cursor-pointer">
+                Caveman (Less token usage)
+              </label>
+            </div>
             <LimitRulesEditor rules={draft.limitRules} onChange={(limitRules) => updateDraft({ limitRules })} />
 
             {apiKey.limits.length > 0 ? (

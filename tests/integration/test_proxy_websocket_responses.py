@@ -4973,7 +4973,13 @@ def test_v1_responses_websocket_accepts_and_reuses_generated_turn_state(app_inst
     assert seen["sticky_kind"] == proxy_module.StickySessionKind.PROMPT_CACHE
 
 
-def test_v1_responses_websocket_normalizes_payload_before_forwarding(app_instance, monkeypatch):
+@pytest.mark.parametrize("caveman_enabled", [False, True])
+def test_v1_responses_websocket_normalizes_payload_before_forwarding(app_instance, monkeypatch, caveman_enabled):
+    from dataclasses import replace
+
+    from app.modules.proxy.caveman import GUIDANCE
+
+    key_data = replace(_capability_test_api_key("caveman-ws"), caveman_enabled=caveman_enabled)
     upstream_messages = [
         _FakeUpstreamMessage(
             "text",
@@ -5008,7 +5014,7 @@ def test_v1_responses_websocket_normalizes_payload_before_forwarding(app_instanc
         return None
 
     async def allow_proxy_api_key(_authorization: str | None, *, request: object | None = None):
-        return None
+        return key_data
 
     async def fake_connect_proxy_websocket(
         self,
@@ -5046,6 +5052,10 @@ def test_v1_responses_websocket_normalizes_payload_before_forwarding(app_instanc
     monkeypatch.setattr(proxy_module, "get_settings_cache", lambda: _FakeSettingsCache())
     monkeypatch.setattr(proxy_module.ProxyService, "_connect_proxy_websocket", fake_connect_proxy_websocket)
     monkeypatch.setattr(proxy_module.ProxyService, "_write_request_log", fake_write_request_log)
+    monkeypatch.setattr(
+        proxy_module.ProxyService, "_refresh_websocket_api_key_policy", AsyncMock(return_value=key_data)
+    )
+    monkeypatch.setattr(proxy_module.ProxyService, "_reserve_websocket_api_key_usage", AsyncMock(return_value=None))
 
     request_payload = {
         "type": "response.create",
@@ -5077,7 +5087,7 @@ def test_v1_responses_websocket_normalizes_payload_before_forwarding(app_instanc
         [
             {
                 "model": "gpt-5.4",
-                "instructions": "",
+                "instructions": GUIDANCE if caveman_enabled else "",
                 "input": [{"role": "user", "content": [{"type": "input_text", "text": "cache me"}]}],
                 "tools": [{"type": "web_search"}],
                 "service_tier": "priority",

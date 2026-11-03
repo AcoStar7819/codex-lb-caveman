@@ -30,6 +30,21 @@ describe("ApiKeyEditDialog", () => {
     );
   }
 
+  it("loads and disables Caveman", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(
+      <ApiKeyEditDialog open busy={false} apiKey={createApiKey({ cavemanEnabled: true })}
+        onOpenChange={vi.fn()} onSubmit={onSubmit} />,
+    );
+    const checkbox = screen.getByRole("checkbox", { name: "Caveman (Less token usage)" });
+    expect(checkbox).toBeChecked();
+    await user.click(checkbox);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0].cavemanEnabled).toBe(false);
+  });
+
   it("labels the reasoning effort trigger with its field and state", () => {
     renderWithProviders(
       <ApiKeyEditDialog

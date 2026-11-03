@@ -45,3 +45,15 @@ For wiring keys into each client, see [Client Setup](client-setup.md).
 ---
 
 *Spec: [api-keys](https://github.com/Soju06/codex-lb/tree/main/openspec/specs/api-keys)*
+
+## Caveman token usage
+
+In an API key's **Limits** section, enable **Caveman (Less token usage)** to request shorter answers and compress suitable JSON tool results. The setting is off by default and applies only to that key.
+
+The Docker image includes the official Caveman Engine. `codex-lb` runs and cleans up the engine inside the same container; no extra container, exposed port, Caveman account or client plugin is needed. Rebuild and recreate your existing container to install the updated image, preserving the existing data volume.
+
+Compression uses reversible TOON tables for uniform JSON arrays. Code, tool arguments, instructions, images and irregular JSON stay unchanged. If compression is unavailable, requests retain their original context. Short-answer guidance still applies. This is not a hard token cap or a guaranteed billing reduction.
+
+For non-Docker installs, input compression requires `caveman-engine` on PATH. Exact-text consumers should leave the option disabled because table encoding preserves values rather than JSON formatting.
+
+See the governing [Caveman context specification](../openspec/specs/caveman-context/spec.md) and [integration context](../openspec/specs/caveman-context/context.md).

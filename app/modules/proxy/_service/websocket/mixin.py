@@ -482,6 +482,7 @@ from app.modules.proxy.capability_routing import (
     reject_capability_signal_outside_response_create,
     strip_capability_metadata,
 )
+from app.modules.proxy.caveman import apply_caveman
 from app.modules.proxy.continuity import resolve_required_account_id
 from app.modules.proxy.durable_bridge_coordinator import (
     DurableBridgeLookup as DurableBridgeLookup,
@@ -3182,6 +3183,7 @@ class _WebSocketMixin:
         # The effort the normalizer replaced is discarded here on purpose: the
         # WebSocket transport never reaches a model source, so the rewrite that
         # works around the backend hang must stick.
+        await apply_caveman(responses_payload, refreshed_api_key, scheduler=scheduler_for(self))
         service_tier_was_enforced = apply_api_key_enforcement(
             responses_payload,
             refreshed_api_key,

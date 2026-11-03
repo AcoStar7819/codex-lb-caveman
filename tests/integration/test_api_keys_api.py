@@ -49,6 +49,91 @@ from app.modules.request_logs.repository import RequestLogsRepository
 
 pytestmark = pytest.mark.integration
 
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/backend-api/codex/responses",
+        "/backend-api/codex/responses/",
+        "/v1/responses",
+        "/v1/responses/",
+        "/v1/chat/completions",
+        "/backend-api/codex/responses/compact",
+    ],
+)
+async def test_caveman_key_policy_round_trip_and_cache(async_client, monkeypatch, path):
+    from app.modules.proxy import caveman
+
+    await async_client.put("/api/settings", json={"apiKeyAuthEnabled": True})
+    await _import_account(async_client, "caveman-account", "caveman@example.com")
+    created = await async_client.post("/api/api-keys/", json={"name": "caveman"})
+    assert created.status_code == 200
+    data = created.json()
+    assert data["cavemanEnabled"] is False
+    headers = {"Authorization": f"Bearer {data['key']}"}
+    original = json.dumps([{"record_id": i, "record_status": "active"} for i in range(30)])
+    seen = []
+
+    async def fake_engine(action, content):
+        return b"small-table" if action == "encode" else original.encode()
+
+    async def fake_stream(payload, *args, **kwargs):
+        seen.append(payload.model_dump())
+        yield (
+            'data: {"type":"response.completed","response":{"id":"resp_cave","output":[], '
+            '"usage":{"input_tokens":3,"output_tokens":2}}}\n\n'
+        )
+
+    async def fake_compact(payload, *args, **kwargs):
+        seen.append(payload.model_dump())
+        return OpenAIResponsePayload.model_validate({"output": []})
+
+    monkeypatch.setattr(proxy_module, "core_compact_responses", fake_compact)
+    monkeypatch.setattr(caveman, "_engine", fake_engine)
+    monkeypatch.setattr(proxy_module, "core_stream_responses", fake_stream)
+
+    for enabled, patch in [
+        (False, None),
+        (True, {"cavemanEnabled": True}),
+        (True, {"name": "renamed"}),
+        (False, {"cavemanEnabled": False}),
+    ]:
+        if patch:
+            updated = await async_client.patch(f"/api/api-keys/{data['id']}", json=patch)
+            assert updated.status_code == 200
+            assert updated.json()["cavemanEnabled"] is enabled
+        body = {
+            "model": "gpt-5.1",
+            "instructions": "hi",
+            "stream": True,
+            "input": [
+                {"type": "function_call", "call_id": "call_a", "name": "read", "arguments": "{}"},
+                {"type": "function_call_output", "call_id": "call_a", "output": original},
+            ],
+        }
+        if "chat/completions" in path:
+            body = {
+                "model": "gpt-5.1",
+                "stream": True,
+                "messages": [
+                    {"role": "system", "content": "hi"},
+                    {
+                        "role": "assistant",
+                        "tool_calls": [
+                            {"id": "call_a", "type": "function", "function": {"name": "read", "arguments": "{}"}}
+                        ],
+                    },
+                    {"role": "tool", "tool_call_id": "call_a", "content": original},
+                ],
+            }
+        response = await async_client.post(path, headers=headers, json=body)
+        assert response.status_code == 200
+        if "compact" not in path and "chat/completions" not in path:
+            assert "response.completed" in response.text
+        assert (caveman.GUIDANCE in seen[-1]["instructions"]) is enabled
+        assert seen[-1]["input"][-1]["output"] == ("[TOON data]\nsmall-table" if enabled else original)
+
+
 _TEST_MODELS = ["model-alpha", "model-beta"]
 _HIDDEN_MODEL = "model-hidden"
 
@@ -1301,7 +1386,10 @@ async def test_source_routed_chat_completion_records_upstream_timings(async_clie
 
 
 @pytest.mark.asyncio
-async def test_source_routed_chat_completion_applies_api_key_enforcement(async_client, monkeypatch):
+@pytest.mark.parametrize("caveman_enabled", [False, True])
+async def test_source_routed_chat_completion_applies_api_key_enforcement(async_client, monkeypatch, caveman_enabled):
+    from app.modules.proxy.caveman import GUIDANCE
+
     enable = await async_client.put(
         "/api/settings",
         json={
@@ -1324,6 +1412,7 @@ async def test_source_routed_chat_completion_applies_api_key_enforcement(async_c
         "/api/api-keys/",
         json={
             "name": "source-enforced-key",
+            "cavemanEnabled": caveman_enabled,
             "assignedSourceIds": [source_id],
             "enforcedReasoningEffort": "high",
             "enforcedServiceTier": "priority",
@@ -1372,6 +1461,7 @@ async def test_source_routed_chat_completion_applies_api_key_enforcement(async_c
     forwarded_payload = cast("dict[str, object]", observed["payload"])
     assert forwarded_payload["reasoning_effort"] == "high"
     assert forwarded_payload["service_tier"] == "priority"
+    assert (GUIDANCE in json.dumps(forwarded_payload["messages"])) is caveman_enabled
 
     # A source route is outside the subscription-account catalog boundary.
     # Even an authoritative "tier absent" answer for account models must not

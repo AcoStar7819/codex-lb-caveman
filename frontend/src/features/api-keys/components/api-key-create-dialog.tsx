@@ -77,6 +77,7 @@ type ApiKeyCreateDraft = {
   trafficClass: TrafficClass;
   transportPolicyOverride: TransportPolicyOverride | null;
   applyToCodexModel: boolean;
+  cavemanEnabled: boolean;
 };
 
 const initialApiKeyCreateDraft: ApiKeyCreateDraft = {
@@ -93,6 +94,7 @@ const initialApiKeyCreateDraft: ApiKeyCreateDraft = {
   trafficClass: "foreground",
   transportPolicyOverride: null,
   applyToCodexModel: false,
+  cavemanEnabled: false,
 };
 
 function apiKeyCreateDraftReducer(
@@ -120,6 +122,7 @@ function ApiKeyCreateForm({ busy, onClose, onSubmit }: ApiKeyCreateFormProps) {
       name: values.name,
       allowedModels: draft.selectedModels.length > 0 ? draft.selectedModels : undefined,
       applyToCodexModel: draft.applyToCodexModel,
+      cavemanEnabled: draft.cavemanEnabled,
       ...(draft.selectedAccountIds.length > 0 ? { assignedAccountIds: draft.selectedAccountIds } : {}),
       ...(draft.selectedSourceIds.length > 0 ? { assignedSourceIds: draft.selectedSourceIds } : {}),
       usageSections: draft.usageSections,
@@ -315,6 +318,16 @@ function ApiKeyCreateForm({ busy, onClose, onSubmit }: ApiKeyCreateFormProps) {
 
             <div className="space-y-3 pl-1 pr-2 max-sm:mt-3 max-sm:border-t max-sm:pt-3">
             <h4 className="sticky top-0 bg-background pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("apiKeys.form.limits")}</h4>
+            <div className="flex items-center gap-2 rounded-md border p-2 text-sm">
+              <Checkbox
+                id="create-api-key-caveman"
+                checked={draft.cavemanEnabled}
+                onCheckedChange={(checked) => updateDraft({ cavemanEnabled: checked === true })}
+              />
+              <label htmlFor="create-api-key-caveman" className="cursor-pointer">
+                Caveman (Less token usage)
+              </label>
+            </div>
             <LimitRulesEditor rules={draft.limitRules} onChange={(limitRules) => updateDraft({ limitRules })} />
           </div>
         </div>

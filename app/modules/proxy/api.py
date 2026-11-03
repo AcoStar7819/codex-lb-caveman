@@ -276,6 +276,7 @@ from app.modules.proxy._service.support import (
 from app.modules.proxy.account_cache import get_account_selection_cache
 from app.modules.proxy.api_key_usage import estimate_api_key_request_usage
 from app.modules.proxy.capability_routing import required_capability_metadata_values
+from app.modules.proxy.caveman import apply_caveman, apply_caveman_chat
 from app.modules.proxy.downstream_delivery import DeliveryTracedStreamingResponse
 from app.modules.proxy.helpers import _openai_error_param, _parse_openai_error, _rate_limit_details
 from app.modules.proxy.http_bridge_forwarding import (
@@ -2239,6 +2240,7 @@ async def _apply_api_key_enforcement_with_fast_mode_policy(
     api_key: ApiKeyData | None,
 ) -> tuple[bool, bool, str | None]:
     prohibit_fast_mode = await _prohibit_fast_mode_enabled()
+    await apply_caveman(payload, api_key)
     enforcement = apply_api_key_enforcement(
         payload,
         api_key,
@@ -5549,6 +5551,7 @@ async def _source_chat_completion_response(
     source_payload = payload.model_dump(mode="json", exclude_none=True)
     source_payload["model"] = model
     source_payload["stream"] = bool(payload.stream)
+    await apply_caveman_chat(source_payload, api_key)
     apply_api_key_enforcement_to_chat_payload(
         source_payload,
         api_key,
@@ -6329,6 +6332,7 @@ async def _stream_responses(
     forwarded_effective_service_tier = payload.service_tier if forwarded_request else None
     service_tier_was_enforced = False
     if not api_key_policy_already_applied:
+        await apply_caveman(payload, api_key)
         service_tier_was_enforced = apply_api_key_enforcement(
             payload,
             api_key,
@@ -6793,6 +6797,7 @@ async def _collect_responses(
     if not api_key_policy_already_applied:
         # The replaced effort is discarded: this path uses subscription
         # accounts, so the backend-hang rewrite must stick.
+        await apply_caveman(payload, api_key)
         service_tier_was_enforced = apply_api_key_enforcement(
             payload,
             api_key,
@@ -7020,6 +7025,7 @@ async def _compact_responses(
 ) -> JSONResponse:
     # The replaced effort is discarded: this path is subscription-only, so the
     # rewrite that works around the backend hang must stick.
+    await apply_caveman(payload, api_key)
     service_tier_was_enforced = apply_api_key_enforcement(
         payload,
         api_key,

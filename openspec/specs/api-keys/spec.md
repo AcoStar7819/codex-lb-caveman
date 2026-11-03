@@ -1943,3 +1943,14 @@ The database SHALL provide an index that supports filtering request logs by API 
 - **THEN** the `request_logs` table includes an index whose leading key columns are `api_key_id` and descending `requested_at`
 - **AND** the 7-day account-cost breakdown query for an API key is satisfiable by that index for its filter phase
 
+### Requirement: Per-key Caveman setting
+API-key create, update and read operations SHALL support a boolean `cavemanEnabled`. New and existing keys MUST default to false. Omitting the field on update MUST preserve its value. The Limits section of key creation and editing MUST display a checkbox labelled `Caveman (Less token usage)`. Updates MUST invalidate cached key policy.
+
+#### Scenario: Enable and reload
+- **WHEN** an operator enables Caveman and saves a key
+- **THEN** subsequent reads and authenticated requests use the enabled policy
+
+#### Scenario: Preserve and disable
+- **WHEN** an enabled key is updated without the Caveman field
+- **THEN** it remains enabled
+- **AND** explicitly setting the field to false disables it
